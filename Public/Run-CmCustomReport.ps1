@@ -1,91 +1,158 @@
-#Requires -Version 3
+#requires -Version 3
 <#
 .DESCRIPTION
-    Sneak in and read data from ConfigMgr SQL database
-.PARAMETER QueryFile
-    If Output = CSV then pipeline or individual names can be passed in
-    to provide CLI automation flow
+
 .PARAMETER ServerName
-    SQL Server Hostname (FQDN)
+
 .PARAMETER SiteCode
-    ConfigMgr Site Code
-.PARAMETER QPath
-    Path to .sql files (default is .\queries)
-.PARAMETER Output
-    List: Grid, Csv, Pipeline
+
+.PARAMETER InputType
+
+.PARAMETER QueryFile
+
+.PARAMETER QueryFilePath
+
+.PARAMETER OutputType
+
 .PARAMETER OutputPath
-    Path to where output files are saved (CSV option)
-.EXAMPLE
-    .\Run-CmCustomQuery.ps1
-.EXAMPLE
-    .\Run-CmCustomQuery.ps1 -ServerName "cm01.fabrikam.local" -SiteCode "PS1"
-.EXAMPLE
-    .\Run-CmCustomQuery.ps1 -Output Csv -OutputPath ".\reports\"
-.EXAMPLE
-    .\Run-CmCustomQuery.ps1 -Output Pipeline | ?{$_.Installs -gt 50}
+
 .NOTES
-    0.1.0 - DS - Initial release
-    0.1.1 - DS - Documentation, Gridview title enhancement
-    0.1.2 - DS - Display output path for CSV option at completion
-    0.1.3 - DS - Command line input for query file
-    0.1.4 - DS - Fixed bug in Grid view title to use $QueryName
+
+.EXAMPLE
+
+.EXAMPLE
+
 #>
 
 [CmdletBinding()]
 param (
-    [parameter(ValueFromPipeline=$True, Mandatory=$False, HelpMessage="Query Filename")]
+    [parameter(Mandatory=$True)]
+        [ValidateNotNullOrEmpty()]
+        [string] $ServerName,
+    [parameter(Mandatory=$True)]
+        [ValidateNotNullOrEmpty()]
+        [string] $SiteCode,
+    [parameter(Mandatory=$False)]
+        [ValidateSet('Select','File','Folder')]
+        [string] $InputType = 'Select',
+    [parameter(Mandatory=$False)]
         [string] $QueryFile = "",
-    [parameter(Mandatory=$False, HelpMessage="ConfigMgr DB Server Name")]
-        [ValidateNotNullOrEmpty()]
-        [string] $ServerName = "hcidalas37.hci.pvt",
-    [parameter(Mandatory=$False, HelpMessage="ConfigMgr Site Code")]
-        [ValidateNotNullOrEmpty()]
-        [string] $SiteCode = "HHQ",
-    [parameter(Mandatory=$False, HelpMessage="Path to query files")]
-        [ValidateNotNullOrEmpty()]
-        [string] $QPath = ".\queries",
-    [parameter(Mandatory=$False, HelpMessage="Output Type")]
-        [ValidateSet('Grid','Csv','Pipeline')]
-        [string] $Output = 'Grid',
-    [parameter(Mandatory=$False, HelpMessage="Path for CSV output files")]
+    [parameter(Mandatory=$False)]
+        [string] $QueryFilePath = "",
+    [parameter(Mandatory=$False)]
+        [ValidateSet('Pipeline','Csv','Excel','Grid')]
+        [string] $OutputType = 'Pipeline',
+    [parameter(Mandatory=$False)]
         [string] $OutputPath = $PWD
 )
 
-if (![string]::IsNullOrEmpty($QueryFile)) {
-    Write-Verbose "validating query file"
-    if (!(Test-Path $QueryFile)) {
-        Write-Warning "$QueryFile not found!"
-        break
-    }
-    else {
-        $f = Get-Item -Path $QueryFile
-        $QueryFile = $f.FullName
-        $QueryName = $f.BaseName
-    }
+Write-Verbose "servername...... $ServerName"
+Write-Verbose "sitecode........ $SiteCode"
+
+if ([string]::IsNullOrEmpty($QueryFilePath)) {
+    $QueryFilePath = $PWD
 }
-else {
-    Write-Verbose "getting list of query files to display in gridview"
-    $qfiles = Get-ChildItem -Path $QPath -Filter "*.sql" | Sort-Object Name
-    if ($qfiles.count -lt 1) {
-        Write-Warning "$QPath contains no .sql files"
+$OutputPath = $(Get-Item -Path $OutputPath).FullName
+Write-Verbose "inputType....... $InputType"
+Write-Verbose "outputType...... $OutputType"
+Write-Verbose "outputPath...... $OutputPath"
+Write-Verbose "queryFile....... $QueryFile"
+Write-Verbose "queryFilePath... $QueryFilePath"
+
+function ConvertTo-Excel {
+    param (
+        [parameter(Mandatory=$True)]
+            [ValidateNotNullOrEmpty()]
+            [string] $CsvFile,
+        [parameter(Mandatory=$True)]
+            [ValidateNotNullOrEmpty()]
+            [string] $XlFile,
+        [parameter(Mandatory=$False)]
+            [string] $delimiter = ','
+    )
+    if (!(Test-Path $CsvFile)) {
+        Write-Error "$CsvFile not found!"
         break
     }
-    Write-Verbose "$($qfiles.count) query files were found"
-    $QueryFile = $qfiles | Select -ExpandProperty Name | 
-        Out-GridView -Title "Select Query to Run" -OutputMode Single
-    if (![string]::IsNullOrEmpty($QueryFile)) {
-        $f = Get-ChildItem -Path $(Join-Path -Path $QPath -ChildPath $QueryFile)
-        $QueryFile = $f.FullName
-        $QueryName = $f.BaseName
+    Write-Verbose "opening an instance of microsoft excel"
+    $excel = New-Object -ComObject Excel.Application 
+    Write-Verbose "adding workbook"
+    $workbook  = $excel.Workbooks.Add(1)
+    Write-Verbose "selectincg worksheet 1"
+    $worksheet = $workbook.worksheets.Item(1)
+    $TxtConnector = ("TEXT;" + $CsvFile)
+    Write-Verbose "connector: $TxtConnector"
+    $Connector = $worksheet.QueryTables.Add($TxtConnector,$worksheet.Range("A1"))
+    $query = $worksheet.QueryTables.Item($Connector.name)
+    $query.TextFileOtherDelimiter = $delimiter
+    $query.TextFileParseType  = 1
+    $query.TextFileColumnDataTypes = ,1 * $worksheet.Cells.Columns.Count
+    $query.AdjustColumnWidth = 1
+    $query.Refresh()
+    $query.Delete()
+    Write-Verbose "saving content to $XlFile"
+    try {
+        $Workbook.SaveAs($XlFile,51) | Out-Null
+        Write-Verbose "saved output successfully"
+        $result = 0
     }
-    else {
-        Write-Verbose "nothing selected. exiting now."
-        break
+    catch {
+        Write-Verbose "error: $($_.Exception.Message)"
+        $result = -1
     }
+    finally {
+        $excel.Quit()
+    }
+    Write-Output $result
 }
 
-Write-Verbose "queryfile: $QueryFile"
-Write-Verbose "queryname: $QueryName"
+switch ($InputType) {
+    'File' {
+        if (!(Test-Path $QueryFile)) {
+            Write-Warning "$QueryFile not found!"
+            $stop = $true
+        }
+        else {
+            Write-Verbose "$QueryFile verified"
+        }
+        break
+    }
+    'Folder' {
+        if (!(Test-Path $QueryFilePath)) {
+            $stop = $True
+            break
+        }
+        else {
+            $qfiles = Get-ChildItem -Path $QueryFilePath -Filter "*.sql" | Sort-Object Name
+            Write-Verbose "$($qfiles.count) query files were found"
+        }
+        break
+    }
+    default {
+        $qfiles = Get-ChildItem -Path $QueryFilePath -Filter "*.sql" | Sort-Object Name
+        if ($qfiles.count -lt 1) {
+            Write-Warning "$QueryFilePath contains no .sql files"
+            break
+        }
+        Write-Verbose "$($qfiles.count) query files were found"
+        if (('Csv','Excel') -contains $OutputType) {
+            $qfiles = $qfiles | Select -ExpandProperty Name | Out-GridView -Title "Select Queries to Run" -OutputMode Multiple
+        }
+        else {
+            $qfiles = $qfiles | Select -ExpandProperty Name | Out-GridView -Title "Select Query to Run" -OutputMode Single
+        }
+        if (!($qfiles.Count -gt 0)) {
+            Write-Warning "No queries were selected"
+            $stop = $True
+        }
+        else {
+            Write-Verbose "$($qfiles.Count) queries were selected"
+        }
+        break
+    }
+} # switch
+
+if ($stop) { break }
 
 Write-Verbose "opening database connection"
 $QueryTimeout = 120
@@ -103,45 +170,63 @@ catch {
     break
 }
 
-Write-Verbose "reading: $QueryFile"
-$qtext = Get-Content -Path $QueryFile
-if (![string]::IsNullOrEmpty($qtext)) {
-    if ($qtext -match '@COLLID@') {
-        $qtext = $qtext.Replace('@COLLID@', $CollectionID)
+foreach ($qfile in $qfiles) {
+    $f = Get-Item -Path (Join-Path -Path $QueryFilePath -ChildPath $qfile)
+    $QueryFile  = $f.FullName
+    $QueryName  = $f.BaseName -replace '.sql',''
+    $OutputFile = Join-Path -Path $OutputPath -ChildPath "$QueryName.csv"
+    $ExcelFile  = $OutputFile -replace '.csv','.xlsx'
+    Write-Verbose "query file...... $QueryFile"
+    Write-Verbose "query name...... $QueryName"
+    Write-Verbose "output file..... $OutputFile"
+    Write-Verbose "excel file...... $ExcelFile"
+    $qtext = Get-Content -Path $QueryFile
+    if (![string]::IsNullOrEmpty($qtext)) {
         Write-Verbose "QUERY... $qtext"
-    }
-    else {
-        Write-Verbose "QUERY... $qtext"
-    }
-    $cmd = New-Object System.Data.SqlClient.SqlCommand($qtext,$conn)
-    $cmd.CommandTimeout = $QueryTimeout
-    $ds = New-Object System.Data.DataSet
-    $da = New-Object System.Data.SqlClient.SqlDataAdapter($cmd)
-    [void]$da.Fill($ds)
-    $rowcount = $($ds.Tables).Rows.Count
-    if ($rowcount -gt 0) {
-        Write-Host "$rowcount rows returned" -ForegroundColor Green
-        switch ($Output) {
-            'Grid' {
-                $($ds.Tables).Rows | Out-GridView -Title "Query Results: $QueryName"
-                break
-            }
-            'Csv' {
-                $csvfile = Join-Path -Path $OutputPath -ChildPath "$QueryName.csv"
-                Write-Verbose "csv file... $csvfile"
-                $($ds.Tables).Rows | Export-Csv -NoTypeInformation -Path $csvfile
-                Write-Host "exported to: $csvfile" -ForegroundColor Green
-                break
-            }
-            default {
-                $($ds.Tables).Rows
-            }
-        } # switch
-    }
-    else {
-        Write-Host "No rows were returned" -ForegroundColor Magenta
-    }
-}
+        $cmd = New-Object System.Data.SqlClient.SqlCommand($qtext,$conn)
+        $cmd.CommandTimeout = $QueryTimeout
+        $ds = New-Object System.Data.DataSet
+        $da = New-Object System.Data.SqlClient.SqlDataAdapter($cmd)
+        [void]$da.Fill($ds)
+        $rowcount = $($ds.Tables).Rows.Count
+        if ($rowcount -gt 0) {
+            Write-Host "$rowcount rows returned" -ForegroundColor Green
+            switch ($OutputType) {
+                'Pipeline' {
+                    $($ds.Tables).Rows
+                    break
+                }
+                'Csv' {
+                    Write-Verbose "report file..... $OutputFile"
+                    $($ds.Tables).Rows | Export-Csv -NoTypeInformation -Path $OutputFile
+                    Write-Host "exported to: $csvfile" -ForegroundColor Green
+                    break
+                }
+                'Excel' {
+                    Write-Verbose "excel file...... $ExcelFile"
+                    $($ds.Tables).Rows | Export-Csv -NoTypeInformation -Path $OutputFile
+                    $exitcode = ConvertTo-Excel -CsvFile $OutputFile -XlFile $ExcelFile
+                    Write-Verbose "exit code....... $exitcode"
+                    Write-Host "exported to: $ExcelFile" -ForegroundColor Green
+                    break
+                }
+                default {
+                    Write-Verbose "grid view....... "
+                    $($ds.Tables).Rows | Out-GridView -Title "Query Results: $QueryName"
+                    break
+                }
+            } # switch
+        }
+        else {
 
+        }
+    } # if
+    else {
+        Write-Warning "$QueryFile is empty"
+    }
+} # foreach
+
+Write-Verbose "closing database connection"
 $conn.Close()
-Write-Verbose "database connection closed"
+
+Write-Verbose "done!"
