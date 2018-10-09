@@ -2,6 +2,7 @@ SELECT DISTINCT
 	dbo.v_R_System.Name0 AS Computer, 
 	dbo.v_GS_SoftwareFile.FileName, 
 	dbo.v_GS_SoftwareFile.FileVersion, 
+	dbo.v_GS_SoftwareFile.FileModifiedDate, 
 	CASE 
 		WHEN (FileVersion = '18.151.0729.0012') THEN 'Current' 
 		ELSE '' END AS Status, 
