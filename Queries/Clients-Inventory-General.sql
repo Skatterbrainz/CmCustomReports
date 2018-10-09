@@ -3,11 +3,13 @@ SELECT DISTINCT
 	dbo.vWorkstationStatus.UserName,
 	dbo.v_GS_OPERATING_SYSTEM.Caption0 AS OperatingSystem, 
     CASE 
+    		WHEN (dbo.v_GS_OPERATING_SYSTEM.BuildNumber0 = 10240) THEN '1507' 
 		WHEN (dbo.v_GS_OPERATING_SYSTEM.BuildNumber0 = 10586) THEN '1511' 
 		WHEN (dbo.v_GS_OPERATING_SYSTEM.BuildNumber0 = 14393) THEN '1607' 
 		WHEN (dbo.v_GS_OPERATING_SYSTEM.BuildNumber0 = 15063) THEN '1703' 
 		WHEN (dbo.v_GS_OPERATING_SYSTEM.BuildNumber0 = 16299) THEN '1709' 
 		WHEN (dbo.v_GS_OPERATING_SYSTEM.BuildNumber0 = 17134) THEN '1803' 
+		WHEN (dbo.v_GS_OPERATING_SYSTEM.BuildNumber0 = 17604) THEN '1809' 
 		WHEN (dbo.v_GS_OPERATING_SYSTEM.BuildNumber0 = 7601) THEN 'SP1' 
 		WHEN (dbo.v_GS_OPERATING_SYSTEM.BuildNumber0 = 9600) THEN 'RTM' 
 		ELSE dbo.v_GS_OPERATING_SYSTEM.BuildNumber0 END AS OsBuild, 
