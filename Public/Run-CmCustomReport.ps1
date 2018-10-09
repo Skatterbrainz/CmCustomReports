@@ -13,12 +13,14 @@
     Path to .sql files (default is .\queries)
 .PARAMETER Output
     List: Grid, Csv, Pipeline
+.PARAMETER OutputPath
+    Path to where output files are saved (CSV option)
 .EXAMPLE
     .\Run-CmCustomQuery.ps1
 .EXAMPLE
     .\Run-CmCustomQuery.ps1 -ServerName "cm01.fabrikam.local" -SiteCode "PS1"
 .EXAMPLE
-    .\Run-CmCustomQuery.ps1 -Output Csv
+    .\Run-CmCustomQuery.ps1 -Output Csv -OutputPath ".\reports\"
 .EXAMPLE
     .\Run-CmCustomQuery.ps1 -Output Pipeline | ?{$_.Installs -gt 50}
 .NOTES
@@ -26,6 +28,7 @@
     0.1.1 - DS - Documentation, Gridview title enhancement
     0.1.2 - DS - Display output path for CSV option at completion
     0.1.3 - DS - Command line input for query file
+    0.1.4 - DS - Fixed bug in Grid view title to use $QueryName
 #>
 
 [CmdletBinding()]
@@ -34,10 +37,10 @@ param (
         [string] $QueryFile = "",
     [parameter(Mandatory=$False, HelpMessage="ConfigMgr DB Server Name")]
         [ValidateNotNullOrEmpty()]
-        [string] $ServerName = "cm01.contoso.local",
+        [string] $ServerName = "hcidalas37.hci.pvt",
     [parameter(Mandatory=$False, HelpMessage="ConfigMgr Site Code")]
         [ValidateNotNullOrEmpty()]
-        [string] $SiteCode = "P01",
+        [string] $SiteCode = "HHQ",
     [parameter(Mandatory=$False, HelpMessage="Path to query files")]
         [ValidateNotNullOrEmpty()]
         [string] $QPath = ".\queries",
@@ -103,7 +106,13 @@ catch {
 Write-Verbose "reading: $QueryFile"
 $qtext = Get-Content -Path $QueryFile
 if (![string]::IsNullOrEmpty($qtext)) {
-    Write-Verbose "QUERY... $qtext"
+    if ($qtext -match '@COLLID@') {
+        $qtext = $qtext.Replace('@COLLID@', $CollectionID)
+        Write-Verbose "QUERY... $qtext"
+    }
+    else {
+        Write-Verbose "QUERY... $qtext"
+    }
     $cmd = New-Object System.Data.SqlClient.SqlCommand($qtext,$conn)
     $cmd.CommandTimeout = $QueryTimeout
     $ds = New-Object System.Data.DataSet
@@ -114,7 +123,7 @@ if (![string]::IsNullOrEmpty($qtext)) {
         Write-Host "$rowcount rows returned" -ForegroundColor Green
         switch ($Output) {
             'Grid' {
-                $($ds.Tables).Rows | Out-GridView -Title "Query Results: $($qfile -replace '.sql','')"
+                $($ds.Tables).Rows | Out-GridView -Title "Query Results: $QueryName"
                 break
             }
             'Csv' {
