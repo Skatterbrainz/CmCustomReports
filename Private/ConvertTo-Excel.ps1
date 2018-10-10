@@ -1,12 +1,12 @@
 function ConvertTo-Excel {
     param (
-        [parameter(Mandatory=$True)]
+        [parameter(Mandatory=$True, HelpMessage="CSV file path")]
             [ValidateNotNullOrEmpty()]
             [string] $CsvFile,
-        [parameter(Mandatory=$True)]
+        [parameter(Mandatory=$True, HelpMessage="XLSX file path")]
             [ValidateNotNullOrEmpty()]
             [string] $XlFile,
-        [parameter(Mandatory=$False)]
+        [parameter(Mandatory=$False, HelpMessage="CSV column delimiter character")]
             [string] $delimiter = ','
     )
     if (!(Test-Path $CsvFile)) {
@@ -15,9 +15,7 @@ function ConvertTo-Excel {
     }
     Write-Verbose "opening an instance of microsoft excel"
     $excel = New-Object -ComObject Excel.Application 
-    Write-Verbose "adding workbook"
     $workbook  = $excel.Workbooks.Add(1)
-    Write-Verbose "selectincg worksheet 1"
     $worksheet = $workbook.worksheets.Item(1)
     $TxtConnector = ("TEXT;" + $CsvFile)
     Write-Verbose "connector: $TxtConnector"
