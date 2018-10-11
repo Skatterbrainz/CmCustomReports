@@ -23,12 +23,14 @@
     Folder where .csv or .xlsx files will be saved
 .NOTES
     1.0.0 - DS - Initial release
+    1.0.1 - DS - Added Excel output option
+    1.0.2 - DS - Fixed Excel "saveas" when existing found
 .EXAMPLE
-    Run-CmCustomReport -ServerName 'cm01.contoso.local' -SiteCode 'P01'
+    Run-CmCustomQuery -ServerName 'cm01.contoso.local' -SiteCode 'P01'
 .EXAMPLE
-    Run-CmCustomReport -ServerName 'cm01.contoso.local' -SiteCode 'P01' -InputType Folder -OutputType Csv -OutputPath "c:\reports"
+    Run-CmCustomQuery -ServerName 'cm01.contoso.local' -SiteCode 'P01' -InputType Folder -OutputType Csv -OutputPath "c:\reports"
 .EXAMPLE
-    Run-CmCustomReport -ServerName 'cm01.contoso.local' -SiteCode 'P01' -QueryFile $qfiles -OutputType Excel -OutputPath "c:\reports"
+    Run-CmCustomQuery -ServerName 'cm01.contoso.local' -SiteCode 'P01' -QueryFile $qfiles -OutputType Excel -OutputPath "c:\reports"
 #>
 
 function Run-CmCustomQuery {
