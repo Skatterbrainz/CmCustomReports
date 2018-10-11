@@ -31,38 +31,34 @@
     Run-CmCustomReport -ServerName 'cm01.contoso.local' -SiteCode 'P01' -QueryFile $qfiles -OutputType Excel -OutputPath "c:\reports"
 #>
 
-[CmdletBinding()]
-function Run-CmCustomReport {
+function Run-CmCustomQuery {
+    [CmdletBinding()]
     param (
-        [parameter(Mandatory=$True, HelpMessage="SQL Server Hostname")]
+        [parameter(Mandatory=$True, HelpMessage="Site Database Server Name")]
             [ValidateNotNullOrEmpty()]
             [string] $ServerName,
         [parameter(Mandatory=$True, HelpMessage="ConfigMgr Site Code")]
             [ValidateNotNullOrEmpty()]
             [string] $SiteCode,
-        [parameter(Mandatory=$False, HelpMessage="Query input type")]
+        [parameter(Mandatory=$False, HelpMessage="Query Input Type")]
             [ValidateSet('Select','File','Folder')]
             [string] $InputType = 'Select',
-        [parameter(Mandatory=$False, HelpMessage="Query File names")]
-            [string[]] $QueryFile = "",
+        [parameter(Mandatory=$False, HelpMessage="Query File names when using Input type File")]
+            [string] $QueryFile = "",
         [parameter(Mandatory=$False, HelpMessage="Path to Query files")]
-            [string] $QueryFilePath = "",
-        [parameter(Mandatory=$False, HelpMessage="Output type")]
+            [string] $QueryFilePath = ".\queries\",
+        [parameter(Mandatory=$False, HelpMessage="Output Type")]
             [ValidateSet('Pipeline','Csv','Excel','Grid')]
             [string] $OutputType = 'Pipeline',
-        [parameter(Mandatory=$False, HelpMessage="Output folder for result files")]
-            [string] $OutputPath = $PWD
+        [parameter(Mandatory=$False, HelpMessage="Path for Output files when using Csv or Excel")]
+            [string] $OutputPath = ".\reports\"
     )
-    $ModuleData = Get-Module CmCustomReport
-    $ModuleVer  = $ModuleData.Version -join '.'
-    $ModulePath = $ModuleData.Path -replace 'CmCustomReport.psm1', ''
-   
-    Write-Verbose "module version.. $ModuleVer"
+
     Write-Verbose "servername...... $ServerName"
     Write-Verbose "sitecode........ $SiteCode"
-    
+
     if ([string]::IsNullOrEmpty($QueryFilePath)) {
-        $QueryFilePath = Join-Path -Path $ModulePath -ChildPath "Queries"
+        $QueryFilePath = $PWD
     }
     $OutputPath = $(Get-Item -Path $OutputPath).FullName
     Write-Verbose "inputType....... $InputType"
@@ -70,25 +66,76 @@ function Run-CmCustomReport {
     Write-Verbose "outputPath...... $OutputPath"
     Write-Verbose "queryFile....... $QueryFile"
     Write-Verbose "queryFilePath... $QueryFilePath"
-    
+
+    function ConvertTo-Excel {
+        param (
+            [parameter(Mandatory=$True)]
+                [ValidateNotNullOrEmpty()]
+                [string] $CsvFile,
+            [parameter(Mandatory=$True)]
+                [ValidateNotNullOrEmpty()]
+                [string] $XlFile,
+            [parameter(Mandatory=$False)]
+                [string] $delimiter = ','
+        )
+        if (!(Test-Path $CsvFile)) {
+            Write-Error "$CsvFile not found!"
+            break
+        }
+        Write-Verbose "opening an instance of microsoft excel"
+        $excel = New-Object -ComObject Excel.Application 
+        Write-Verbose "adding workbook"
+        $workbook  = $excel.Workbooks.Add(1)
+        Write-Verbose "selectincg worksheet 1"
+        $worksheet = $workbook.worksheets.Item(1)
+        $TxtConnector = ("TEXT;" + $CsvFile)
+        Write-Verbose "connector: $TxtConnector"
+        $Connector = $worksheet.QueryTables.Add($TxtConnector,$worksheet.Range("A1"))
+        $query = $worksheet.QueryTables.Item($Connector.name)
+        $query.TextFileOtherDelimiter = $delimiter
+        $query.TextFileParseType  = 1
+        $query.TextFileColumnDataTypes = ,1 * $worksheet.Cells.Columns.Count
+        $query.AdjustColumnWidth = 1
+        $query.Refresh()
+        $query.Delete()
+        Write-Verbose "saving content to $XlFile"
+        try {
+            if (Test-Path $XlFile) { Remove-Item -Path $XlFile -Force }
+            $Workbook.SaveAs($XlFile,51) | Out-Null
+            Write-Verbose "saved output successfully"
+            $result = 0
+        }
+        catch {
+            Write-Verbose "error: $($_.Exception.Message)"
+            $result = -1
+        }
+        finally {
+            $excel.Quit()
+        }
+        if ($excel) { 
+            Get-Process -Name 'EXCEL' | Stop-Process -Confirm:$False
+        }
+        Write-Output $result
+    }
+
     switch ($InputType) {
         'File' {
-            foreach ($qf in QueryFile) {
-                if (!(Test-Path $qf)) {
-                    Write-Warning "$qf not found!"
-                    $stop = $True
-                    break
+            if (!(Test-Path $QueryFile)) {
+                if (!(Test-Path (Join-Path -Path $QueryFilePath -ChildPath $QueryFile))) {
+                    Write-Warning "$QueryFile not found!"
+                    $stop = $true
+                }
+                else {
+                    $qfiles = @((Join-Path -Path $QueryFilePath -ChildPath $QueryFile))
                 }
             }
-            if (!$stop) {
-                Write-Verbose "$($QueryFile.count) files were validated"
-                $qfiles = $QueryFile
+            else {
+                $qfiles = @($QueryFile)
             }
             break
         }
         'Folder' {
             if (!(Test-Path $QueryFilePath)) {
-                Write-Warning "$QuerFilePath not found!"
                 $stop = $True
                 break
             }
@@ -106,29 +153,28 @@ function Run-CmCustomReport {
             }
             Write-Verbose "$($qfiles.count) query files were found"
             if (('Csv','Excel') -contains $OutputType) {
-                Write-Verbose "file output = allow multiple input query files"
                 $qfiles = $qfiles | Select -ExpandProperty Name | Out-GridView -Title "Select Queries to Run" -OutputMode Multiple
             }
             else {
-                Write-Verbose "pipeline output = allow single input query file"
                 $qfiles = $qfiles | Select -ExpandProperty Name | Out-GridView -Title "Select Query to Run" -OutputMode Single
             }
             if (!($qfiles.Count -gt 0)) {
-                Write-Warning "No queries were selected (exit)"
+                Write-Warning "No queries were selected"
                 $stop = $True
             }
             else {
-                Write-Verbose "$($qfiles.Count) query files were selected"
+                Write-Verbose "$($qfiles.Count) queries were selected"
             }
             break
         }
     } # switch
-    
+
     if ($stop) { break }
-    
+
     Write-Verbose "opening database connection"
     $QueryTimeout = 120
     $ConnectionTimeout = 30
+    #Action of connecting to the Database and executing the query and returning results if there were any.
     $conn = New-Object System.Data.SqlClient.SQLConnection
     $ConnectionString = "Server={0};Database={1};Integrated Security=True;Connect Timeout={2}" -f $ServerName,$DatabaseName,$ConnectionTimeout
     $conn.ConnectionString = $ConnectionString
@@ -140,8 +186,11 @@ function Run-CmCustomReport {
         Write-Error $_.Exception.Message
         break
     }
-    
+
+    Write-Verbose "processing query files list"
+
     foreach ($qfile in $qfiles) {
+        Write-Verbose "file: $qfile"
         $f = Get-Item -Path (Join-Path -Path $QueryFilePath -ChildPath $qfile)
         $QueryFile  = $f.FullName
         $QueryName  = $f.BaseName -replace '.sql',''
@@ -170,7 +219,7 @@ function Run-CmCustomReport {
                     'Csv' {
                         Write-Verbose "report file..... $OutputFile"
                         $($ds.Tables).Rows | Export-Csv -NoTypeInformation -Path $OutputFile
-                        Write-Host "Exported to: $csvfile" -ForegroundColor Green
+                        Write-Host "exported to: $csvfile" -ForegroundColor Green
                         break
                     }
                     'Excel' {
@@ -178,27 +227,29 @@ function Run-CmCustomReport {
                         $($ds.Tables).Rows | Export-Csv -NoTypeInformation -Path $OutputFile
                         $exitcode = ConvertTo-Excel -CsvFile $OutputFile -XlFile $ExcelFile
                         Write-Verbose "exit code....... $exitcode"
-                        Write-Host "Exported to: $ExcelFile" -ForegroundColor Green
+                        Write-Host "exported to: $ExcelFile" -ForegroundColor Green
                         break
                     }
                     default {
+                        Write-Verbose "grid view....... "
                         $($ds.Tables).Rows | Out-GridView -Title "Query Results: $QueryName"
                         break
                     }
-                } # switchs
+                } # switch
             }
             else {
-                Write-Host "no results were returned from query" -ForegroundColor Cyan
+
             }
         } # if
         else {
-            Write-Warning "$QueryFile is empty. Review file to confirm."
+            Write-Warning "$QueryFile is empty"
         }
     } # foreach
-    
+
     Write-Verbose "closing database connection"
     $conn.Close()
-    Write-Verbose "done!"
-} # function
 
-Export-ModuleMember -Function Run-CmCustomReport
+    Write-Verbose "done!"
+}
+
+Export-ModuleMember -Function Run-CmCustomQuery
