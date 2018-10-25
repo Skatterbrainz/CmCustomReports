@@ -11,39 +11,24 @@
 
 [CmdletBinding()]
 param (
-    [parameter(Mandatory=$True, ValueFromPipeline=$True, HelpMessage="Collection ID")]
+    [parameter(Mandatory=$False, ValueFromPipeline=$True, HelpMessage="Collection ID")]
         [ValidateNotNullOrEmpty()]
-        [string] $CollectionID,
-    [parameter(Mandatory=$True, HelpMessage="Site Database Server Name")]
+        [string] $CollectionID = "SMS00001",
+    [parameter(Mandatory=$False, HelpMessage="Site Database Server Name")]
         [ValidateNotNullOrEmpty()]
-        [string] $ServerName,
-    [parameter(Mandatory=$True, HelpMessage="ConfigMgr Site Code")]
+        [string] $ServerName = "cm01.contoso.local",
+    [parameter(Mandatory=$False, HelpMessage="ConfigMgr Site Code")]
         [ValidateNotNullOrEmpty()]
-        [string] $SiteCode,
+        [string] $SiteCode = "P01",
+    [parameter(Mandatory=$False, HelpMessage="Select Collection using Gridview")]
+        [switch] $Choose,
     [parameter(Mandatory=$False, HelpMessage="Query if computer is online")]
         [switch] $Ping,
     [parameter(Mandatory=$False, HelpMessage="Display results in gridview")]
         [switch] $Grid
 )
-$qtext = @"
-SELECT DISTINCT 
-  dbo.v_ClientCollectionMembers.Name AS ComputerName, 
-  dbo.v_ClientCollectionMembers.ResourceID, 
-  dbo.v_ClientCollectionMembers.CollectionID, 
-  dbo.v_ClientCollectionMembers.IsClient, 
-  dbo.v_ClientCollectionMembers.Domain, 
-  dbo.v_ClientCollectionMembers.SiteCode, 
-  dbo.v_Collection.Name AS CollectionName
-FROM dbo.v_ClientCollectionMembers INNER JOIN
-  dbo.v_Collection ON 
-  dbo.v_ClientCollectionMembers.CollectionID = dbo.v_Collection.CollectionID
-WHERE dbo.v_ClientCollectionMembers.CollectionID = '$CollectionID' 
-ORDER BY ComputerName
-"@
-
 $QueryTimeout = 120
 $ConnectionTimeout = 30
-#Action of connecting to the Database and executing the query and returning results if there were any.
 $conn = New-Object System.Data.SqlClient.SQLConnection
 $ConnectionString = "Server={0};Database={1};Integrated Security=True;Connect Timeout={2}" -f $ServerName,$DatabaseName,$ConnectionTimeout
 $conn.ConnectionString = $ConnectionString
@@ -55,6 +40,52 @@ catch {
     Write-Error $_.Exception.Message
     break
 }
+
+if ($Choose) {
+    $q1 = "SELECT DISTINCT CollectionID, Name, MemberCount FROM dbo.v_Collection ORDER BY Name"
+    $cmd = New-Object System.Data.SqlClient.SqlCommand($q1,$conn)
+    $cmd.CommandTimeout = $QueryTimeout
+    $ds = New-Object System.Data.DataSet
+    $da = New-Object System.Data.SqlClient.SqlDataAdapter($cmd)
+    [void]$da.Fill($ds)
+
+    $rowcount = $($ds.Tables).Rows.Count
+    if ($rowcount -gt 0) {
+        Write-Host "$rowcount collections returned" -ForegroundColor Cyan
+        $x = $($ds.Tables).Rows | Out-GridView -Title "Select Collection" -OutputMode Single
+    }
+    $conn.Close()
+    if ($x) {
+        $CollectionID = $x | Select -ExpandProperty CollectionID
+    }
+    else {
+        Write-Warning "No selection made"
+        break
+    }
+}
+
+$qtext = @"
+SELECT DISTINCT 
+    dbo.v_R_System.Name0 AS Computer, 
+    dbo.v_R_System.ResourceID, 
+    dbo.v_R_System.User_Name0 AS UserName, 
+    dbo.v_R_System.AD_Site_Name0 AS ADSite, 
+    dbo.v_R_System.Operating_System_Name_and0 AS OS, 
+    dbo.v_R_System.Build01 AS OSBuild, 
+    CASE WHEN (Client0 = 1) THEN 'Y' ELSE 'N' END AS Client, 
+    dbo.v_R_System.Client_Version0 AS ClientVersion, 
+    CASE WHEN (Active0 = 1) THEN 'Y' ELSE 'N' END AS Active, 
+    dbo.v_R_System.Distinguished_Name0, 
+    dbo.v_R_System.Full_Domain_Name0 AS DNSDomain, 
+    dbo.v_R_System.Is_Virtual_Machine0 AS IsVM, 
+    dbo.v_R_System.Last_Logon_Timestamp0 AS LogonTime, 
+    dbo.v_R_System.User_Domain0 AS Domain 
+FROM dbo.v_R_System INNER JOIN
+    dbo.v_ClientCollectionMembers ON dbo.v_R_System.ResourceID = dbo.v_ClientCollectionMembers.ResourceID
+WHERE (dbo.v_ClientCollectionMembers.CollectionID = '$CollectionID')
+ORDER BY Computer
+"@
+
 $cmd = New-Object System.Data.SqlClient.SqlCommand($qtext,$conn)
 $cmd.CommandTimeout = $QueryTimeout
 $ds = New-Object System.Data.DataSet
