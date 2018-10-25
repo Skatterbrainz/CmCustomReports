@@ -24,15 +24,18 @@ FROM
 	dbo.v_R_System ON dbo.v_GS_INSTALLED_SOFTWARE_CATEGORIZED.ResourceID = dbo.v_R_System.ResourceID LEFT OUTER JOIN
 	dbo.vWorkstationStatus ON dbo.v_R_System.ResourceID = dbo.vWorkstationStatus.ResourceID
 WHERE        
-	(dbo.v_GS_INSTALLED_SOFTWARE_CATEGORIZED.ProductName0 IN 
-		('Microsoft Office 365 ProPlus - en-us', 
-		 'Microsoft Project Standard 2016 - en-us', 
-		 'Project Professional 2016 - en-us', 
-		 'Microsoft Project Professional 2016',
-		 'Microsoft Project Professional 2016 - en-us',
-		 'Microsoft Project Professional 2019 - en-us',
-		 'Microsoft Visio Standard 2016 - en-us', 
-		 'Microsoft Visio Professional 2016 - en-us')
-	)
+	dbo.v_GS_INSTALLED_SOFTWARE_CATEGORIZED.ProductName0 LIKE 'Microsoft Office Professional Plus %'
+	OR
+	dbo.v_GS_INSTALLED_SOFTWARE_CATEGORIZED.ProductName0 LIKE 'Microsoft Office Project %'
+	OR
+	dbo.v_GS_INSTALLED_SOFTWARE_CATEGORIZED.ProductName0 LIKE 'Microsoft Project Professional %'
+	OR
+	dbo.v_GS_INSTALLED_SOFTWARE_CATEGORIZED.ProductName0 LIKE 'Microsoft Project Standard %'
+	OR 
+	dbo.v_GS_INSTALLED_SOFTWARE_CATEGORIZED.ProductName0 LIKE 'Microsoft Office Visio %'
+	OR
+	dbo.v_GS_INSTALLED_SOFTWARE_CATEGORIZED.ProductName0 LIKE 'Microsoft Visio Professional %'
+	OR
+	dbo.v_GS_INSTALLED_SOFTWARE_CATEGORIZED.ProductName0 LIKE 'Microsoft Visio Standard %'
 ORDER BY 
 	Computer, ProductName
