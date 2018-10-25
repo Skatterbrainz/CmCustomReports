@@ -3,10 +3,17 @@
 .DESCRIPTION
     Get ConfigMgr Collection Members
 .PARAMETER CollectionID
+    ConfigMgr device collection ID
 .PARAMETER ServerName
+    ConfigMgr SQL server host
 .PARAMETER SiteCode
+    ConfigMgr Site Code
+.PARAMETER Choose
+    select collection ID from grid view query
 .PARAMETER Ping
+    ping each machine in the collection
 .PARAMETER Grid
+    display results in gridview
 #>
 
 [CmdletBinding()]
