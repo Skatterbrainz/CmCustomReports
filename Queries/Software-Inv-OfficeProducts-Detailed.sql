@@ -28,6 +28,9 @@ WHERE
 		('Microsoft Office 365 ProPlus - en-us', 
 		 'Microsoft Project Standard 2016 - en-us', 
 		 'Project Professional 2016 - en-us', 
+		 'Microsoft Project Professional 2016',
+		 'Microsoft Project Professional 2016 - en-us',
+		 'Microsoft Project Professional 2019 - en-us',
 		 'Microsoft Visio Standard 2016 - en-us', 
 		 'Microsoft Visio Professional 2016 - en-us')
 	)
