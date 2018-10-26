@@ -1,6 +1,6 @@
 param (
     [parameter(Mandatory=$False)]
-    [ValidateRange(1,3000)]
+    [ValidateRange(0,3000)]
     [int] $DaysOld = 60,
     [switch] $Detailed
 )
@@ -16,6 +16,7 @@ $all = .\Get-AdsComputers.ps1
 $xcount = $all.Count
 
 $tcount = 0
+$l30  = 0
 $c60  = 0
 $c90  = 0
 $c180 = 0
@@ -37,6 +38,7 @@ foreach ($computer in $all) {
         }
     }
     else {
+        if ($dif -le 30)  { $l30++ }
         if ($dif -ge 60)  { $c60++ }
         if ($dif -ge 90)  { $c90++ }
         if ($dif -ge 180) { $c180++ }
@@ -54,11 +56,13 @@ if ($Detailed) {
     }
 }
 else {
+    $p30  = Get-Pct -HowMany  $l30 -TotalNumber $xcount
     $p60  = Get-Pct -HowMany  $c60 -TotalNumber $xcount
     $p90  = Get-Pct -HowMany  $c90 -TotalNumber $xcount
     $p180 = Get-Pct -HowMany $c180 -TotalNumber $xcount
     $p365 = Get-Pct -HowMany $c365 -TotalNumber $xcount
     $p720 = Get-Pct -HowMany $c720 -TotalNumber $xcount
+    Write-Host "$l30 of $xcount less than 30 days ($p30)" -ForegroundColor Cyan
     Write-Host "$c60 of $xcount more than 60 days ($p60)" -ForegroundColor Cyan
     Write-Host "$c90 of $xcount more than 90 days ($p90)" -ForegroundColor Cyan
     Write-Host "$c180 of $xcount more than 180 days ($p180)" -ForegroundColor Cyan
