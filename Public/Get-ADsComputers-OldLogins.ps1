@@ -37,11 +37,11 @@ foreach ($computer in $all) {
         }
     }
     else {
-        if ($dif -gt 720) { $c720++ }
-        elseif ($dif -gt 365) { $c365++ }
-        elseif ($dif -gt 180) { $c180++ }
-        elseif ($dif -gt 90) { $c90++ }
-        elseif ($dif -gt 60) { $c60++ }
+        if ($dif -ge 60)  { $c60++ }
+        if ($dif -ge 90)  { $c90++ }
+        if ($dif -ge 180) { $c180++ }
+        if ($dif -ge 365) { $c365++ }
+        if ($dif -ge 720) { $c720++ }
     }
 }
 if ($Detailed) {
