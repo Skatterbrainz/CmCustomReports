@@ -43,10 +43,10 @@ dbo.v_GS_INSTALLED_SOFTWARE_CATEGORIZED.Publisher0 AS [Publisher],
 dbo.v_GS_INSTALLED_SOFTWARE_CATEGORIZED.ProductCode0 AS [ProductCode] 
 FROM dbo.v_GS_INSTALLED_SOFTWARE_CATEGORIZED INNER JOIN
 dbo.v_R_System ON dbo.v_GS_INSTALLED_SOFTWARE_CATEGORIZED.ResourceID = dbo.v_R_System.ResourceID
-WHERE (dbo.v_GS_INSTALLED_SOFTWARE_CATEGORIZED.ProductName0 LIKE `'$ProductName`%`')
+WHERE (dbo.v_GS_INSTALLED_SOFTWARE_CATEGORIZED.ProductName0 like `'$ProductName`%`')
 "@
 if (![string]::IsNullOrEmpty($ProductVersion)) {
-    $Query += " AND (ProductVersion like `'$ProductVersion`%`')"
+    $Query += " AND (ProductVersion0 like `'$ProductVersion`%`')"
 }
 
 try {
