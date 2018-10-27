@@ -18,12 +18,12 @@
 param (
     [parameter(Mandatory=$False, HelpMessage="Optional SQL Filter")]
         [string] $QueryFilter = "",
-    [parameter(Mandatory=$False, HelpMessage="ConfigMgr DB Server Name")]
+    [parameter(Mandatory=$True, HelpMessage="ConfigMgr DB Server Name")]
         [ValidateNotNullOrEmpty()]
-        [string] $ServerName = "hcidalas37.hci.pvt",
-    [parameter(Mandatory=$False, HelpMessage="ConfigMgr Site Code")]
+        [string] $ServerName,
+    [parameter(Mandatory=$True, HelpMessage="ConfigMgr Site Code")]
         [ValidateNotNullOrEmpty()]
-        [string] $SiteCode = "HHQ"
+        [string] $SiteCode"
 )
 $DatabaseName = "CM_$SiteCode"
 $QueryTimeout = 120
