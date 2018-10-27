@@ -1,19 +1,38 @@
 [CmdletBinding()]
 param (
-  [parameter(Mandatory=$True)]
-    [ValidateNotNullOrEmpty()]
-    [string] $CollectionID,
-  [parameter(Mandatory=$True)]
-    [ValidateNotNullOrEmpty()]
-    [string] $InputFile,
-  [parameter(Mandatory=$False)]
+    [parameter(Mandatory=$True, HelpMessage="ConfigMgr Collection ID")]
+        [ValidateNotNullOrEmpty()]
+        [string] $CollectionID,
+    [parameter(Mandatory=$True, HelpMessage="Input File")]
+        [ValidateScript({
+            if (-Not($_ | Test-Path)) {
+                throw "File does not exist"
+            }
+            if (-Not($_ | Test-Path -PathType Leaf)) {
+                throw "Must be a file, not a folder"
+            }
+            if ($_ -notmatch "(\.txt)") {
+                throw "Must be a TXT file"
+            }
+            return $True
+        })]
+        [System.IO.FileInfo] $InputFile,
+    [parameter(Mandatory=$True)]
+        [ValidateNotNullOrEmpty()]
+        [string] $ServerName,
+    [parameter(Mandatory=$True)]
+        [ValidateNotNullOrEmpty()]
+        [string] $SiteCode,
     [switch] $DeepInspect,
-  [parameter(Mandatory=$False)]
     [switch] $ShowReverse
 )
-$members = .\Get-CmCollectionMembers.ps1 -CollectionID $CollectionID
+$Time1 = Get-Date
+
+$members = .\tools\Get-CmCollectionMember.ps1 -CollectionID $CollectionID -ServerName $ServerName -SiteCode $SiteCode
 $memberNames = $members | Select -ExpandProperty ComputerName
 $computerlist = Get-Content -Path $InputFile
+$ccount = 0
+$tcount = $computerlist.Count
 
 foreach ($cn in $computerlist) {
     if ($DeepInspect) {
@@ -56,7 +75,7 @@ foreach ($cn in $computerlist) {
         IsOnline = $stat
         IsMember = $ismember
     }
-    New-Object PSObject -Property $data
+    New-Object -TypeName PSObject -Property $data
 } # foreach
 
 if ($ShowReverse) {
