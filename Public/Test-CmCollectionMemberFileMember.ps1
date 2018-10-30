@@ -1,8 +1,7 @@
 [CmdletBinding()]
 param (
-    [parameter(Mandatory=$True, HelpMessage="ConfigMgr Collection ID")]
-        [ValidateNotNullOrEmpty()]
-        [string] $CollectionID,
+    [parameter(Mandatory=$False, HelpMessage="ConfigMgr Collection ID")]
+        [string] $CollectionID = "",
     [parameter(Mandatory=$True, HelpMessage="Input File")]
         [ValidateScript({
             if (-Not($_ | Test-Path)) {
@@ -17,18 +16,23 @@ param (
             return $True
         })]
         [System.IO.FileInfo] $InputFile,
-    [parameter(Mandatory=$True)]
+    [parameter(Mandatory=$False)]
         [ValidateNotNullOrEmpty()]
-        [string] $ServerName,
-    [parameter(Mandatory=$True)]
+        [string] $ServerName = "cm01.contoso.local",
+    [parameter(Mandatory=$False)]
         [ValidateNotNullOrEmpty()]
-        [string] $SiteCode,
+        [string] $SiteCode = "P01",
     [switch] $DeepInspect,
     [switch] $ShowReverse
 )
 $Time1 = Get-Date
 
-$members = .\tools\Get-CmCollectionMember.ps1 -CollectionID $CollectionID -ServerName $ServerName -SiteCode $SiteCode
+if ($CollectionID -eq "") {
+    $members = .\Get-CmCollectionMember.ps1 -Choose -ServerName $ServerName -SiteCode $SiteCode
+}
+else {
+    $members = .\Get-CmCollectionMember.ps1 -CollectionID $CollectionID -ServerName $ServerName -SiteCode $SiteCode
+}
 $memberNames = $members | Select -ExpandProperty ComputerName
 $computerlist = Get-Content -Path $InputFile
 $ccount = 0
